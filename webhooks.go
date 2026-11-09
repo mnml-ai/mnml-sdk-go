@@ -46,7 +46,17 @@ func (e *WebhookEvent) CreditsLow() (*CreditsLow, error) {
 
 // CreditsLow is sent when the balance fell under the threshold (at most once a day).
 type CreditsLow struct {
-	Balance   int64 `json:"balance"`
+	// BalanceUSD is the balance now, in US dollars (four decimals).
+	BalanceUSD float64 `json:"balance_usd"`
+	// ThresholdUSD is the line it fell under, in US dollars.
+	ThresholdUSD float64 `json:"threshold_usd"`
+	// Balance is the balance now, in API credits.
+	//
+	// Deprecated: read BalanceUSD. The same amount in API credits ($0.0099 each); a later release removes it.
+	Balance int64 `json:"balance"`
+	// Threshold is the line it fell under, in API credits.
+	//
+	// Deprecated: read ThresholdUSD. The same amount in API credits ($0.0099 each); a later release removes it.
 	Threshold int64 `json:"threshold"`
 }
 

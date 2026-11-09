@@ -51,8 +51,37 @@ func main() {
 }
 ```
 
-Every call spends credits from your prepaid API balance. Top it up in dollars on
+Every call is paid from your prepaid API balance, in US dollars. Top it up on
 [Billing](https://developers.mnml.ai/console/billing).
+
+### Amounts are in dollars
+
+Every amount the API answers with has a US-dollar field, a `float64` to four decimals (`0.2475`
+is 24.75 cents):
+
+| Where                                    | Dollar fields                                                        |
+| ---------------------------------------- | -------------------------------------------------------------------- |
+| a create (`RenderStarted`, `JobStarted`) | `ChargedUSD`                                                         |
+| `Jobs.Get` (`Job`)                       | `ChargedUSD`, `RefundedUSD`                                          |
+| `Jobs.Cancel` (`JobCanceled`)            | `RefundedUSD`                                                        |
+| `Account.Get` (`Account`)                | `BalanceUSD`, `Key.DailyLimitUSD`, `Limits.DailyUSD` (nil: no limit) |
+| `Engines.List` (`EngineCatalog`)         | `Prices.RenderUSD`, `Prices.EditUSD`, video `Prices[i].USD`          |
+| the `credits.low` webhook (`CreditsLow`) | `BalanceUSD`, `ThresholdUSD`                                         |
+
+```go
+account, err := client.Account.Get(ctx)
+fmt.Printf("$%.4f left\n", account.BalanceUSD)
+
+catalog, err := client.Engines.List(ctx)
+for _, e := range catalog.Engines {
+	fmt.Printf("%s: $%.4f a render\n", e.ID, e.Prices.RenderUSD)
+}
+```
+
+The credit fields beside them (`CreditsCharged`, `CreditsRefunded`, `Account.Credits`,
+`DailyCreditLimit`, `DailyCredits`, `Prices.Render` and `Edit`, `VideoPrice.Credits`, and the
+webhook's `Balance` and `Threshold`) are deprecated: `staticcheck` and gopls flag them, and a
+later release removes them. Read the `USD` fields instead.
 
 ## Configuration
 
@@ -148,9 +177,13 @@ http.HandleFunc("/mnml", func(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "bad signature", http.StatusBadRequest)
 		return
 	}
-	if ev.Type == "job.succeeded" {
+	switch ev.Type {
+	case "job.succeeded":
 		job, _ := ev.Job()
 		fmt.Println(job.Outputs[0].URL)
+	case "credits.low":
+		low, _ := ev.CreditsLow()
+		fmt.Printf("balance down to $%.4f: top up\n", low.BalanceUSD)
 	}
 })
 ```

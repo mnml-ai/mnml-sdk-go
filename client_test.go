@@ -15,7 +15,7 @@ import (
 
 const jobJSON = `{"id":"42","status":"succeeded","kind":"render","engine":"v4.6-ultra",` +
 	`"outputs":[{"url":"https://api.test/v2/files/42?exp=1&sig=x","media":"image","expires_at":"2026-10-18T10:00:00Z"}],` +
-	`"credits_charged":30,"credits_refunded":0,"error":null,"created_at":"2026-10-18T09:00:00Z","completed_at":"2026-10-18T09:00:40Z"}`
+	`"charged_usd":0.297,"refunded_usd":0,"credits_charged":30,"credits_refunded":0,"error":null,"created_at":"2026-10-18T09:00:00Z","completed_at":"2026-10-18T09:00:40Z"}`
 
 func jobWith(status string) string {
 	return strings.Replace(jobJSON, `"succeeded"`, `"`+status+`"`, 1)
@@ -93,7 +93,7 @@ func (f *fakeAPI) client(t *testing.T, opts ...Option) *Client {
 var png = []byte{0x89, 'P', 'N', 'G', 0x0D, 0x0A, 0x1A, 0x0A, 1, 2, 3}
 
 func TestRenderPostsItsBodyWithKeyIdempotencyKeyAndDataURI(t *testing.T) {
-	f := newFake(t).ok(`{"id":"42","ids":["42"],"status":"queued","credits_charged":30,"replayed":false,"notes":[]}`)
+	f := newFake(t).ok(`{"id":"42","ids":["42"],"status":"queued","charged_usd":0.297,"credits_charged":30,"replayed":false,"notes":[]}`)
 	c := f.client(t)
 
 	started, err := c.Renders.Create(context.Background(), &RenderRequest{
@@ -105,7 +105,7 @@ func TestRenderPostsItsBodyWithKeyIdempotencyKeyAndDataURI(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if started.ID != "42" || started.Status != StatusQueued {
+	if started.ID != "42" || started.Status != StatusQueued || started.ChargedUSD != 0.297 {
 		t.Fatalf("started = %+v", started)
 	}
 	r := f.requests[0]
@@ -134,7 +134,7 @@ func TestRenderPostsItsBodyWithKeyIdempotencyKeyAndDataURI(t *testing.T) {
 func TestRetryAfter503SendsTheSameIdempotencyKey(t *testing.T) {
 	f := newFake(t).
 		fail(503, "SERVICE_UNAVAILABLE", "Busy.", "Retry-After", "5").
-		ok(`{"id":"7","status":"queued","credits_charged":2,"replayed":false,"notes":[]}`)
+		ok(`{"id":"7","status":"queued","charged_usd":0.0198,"credits_charged":2,"replayed":false,"notes":[]}`)
 	c := f.client(t)
 
 	if _, err := c.Edits.Create(context.Background(), &EditRequest{Prompt: "Add trees", JobID: "41"}); err != nil {
@@ -218,7 +218,7 @@ func TestWaitGivesUpAfterItsTimeout(t *testing.T) {
 }
 
 func TestARenderThatSettledInTheHeldAnswerNeedsNoPoll(t *testing.T) {
-	f := newFake(t).ok(`{"id":"42","ids":["42"],"status":"succeeded","credits_charged":30,"replayed":false,"notes":[],"jobs":[` + jobJSON + `]}`)
+	f := newFake(t).ok(`{"id":"42","ids":["42"],"status":"succeeded","charged_usd":0.297,"credits_charged":30,"replayed":false,"notes":[],"jobs":[` + jobJSON + `]}`)
 	c := f.client(t)
 
 	jobs, err := c.Renders.CreateAndWait(context.Background(), &RenderRequest{Prompt: "A", Mode: ModeTextToRender}, nil)

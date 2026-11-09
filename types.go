@@ -179,9 +179,14 @@ type VideoRequest struct {
 
 // JobStarted is what a create call answers: the job it started.
 type JobStarted struct {
-	ID             string `json:"id"`
-	Status         string `json:"status"`
-	CreditsCharged int64  `json:"credits_charged"`
+	ID     string `json:"id"`
+	Status string `json:"status"`
+	// ChargedUSD is what the call charged, in US dollars (four decimals).
+	ChargedUSD float64 `json:"charged_usd"`
+	// CreditsCharged is what the call charged, in API credits.
+	//
+	// Deprecated: read ChargedUSD. The same amount in API credits ($0.0099 each); a later release removes it.
+	CreditsCharged int64 `json:"credits_charged"`
 	// Replayed is true when this answers an earlier identical request: nothing new was charged.
 	Replayed bool `json:"replayed"`
 	// Notes say what the API changed or dropped from the request.
@@ -190,9 +195,14 @@ type JobStarted struct {
 
 // RenderStarted is what a render answers: every job it started (one per Count).
 type RenderStarted struct {
-	ID             string   `json:"id"`
-	IDs            []string `json:"ids"`
-	Status         string   `json:"status"`
+	ID     string   `json:"id"`
+	IDs    []string `json:"ids"`
+	Status string   `json:"status"`
+	// ChargedUSD is what the call charged for every job, in US dollars (four decimals).
+	ChargedUSD float64 `json:"charged_usd"`
+	// CreditsCharged is what the call charged, in API credits.
+	//
+	// Deprecated: read ChargedUSD. The same amount in API credits ($0.0099 each); a later release removes it.
 	CreditsCharged int64    `json:"credits_charged"`
 	Replayed       bool     `json:"replayed"`
 	Notes          []string `json:"notes"`
@@ -208,12 +218,22 @@ type Job struct {
 	Kind   string  `json:"kind"`
 	Engine *string `json:"engine"`
 	// Outputs are signed links that expire: download what you keep.
-	Outputs         []JobOutput `json:"outputs"`
-	CreditsCharged  int64       `json:"credits_charged"`
-	CreditsRefunded int64       `json:"credits_refunded"`
-	Error           *JobError   `json:"error"`
-	CreatedAt       time.Time   `json:"created_at"`
-	CompletedAt     *time.Time  `json:"completed_at"`
+	Outputs []JobOutput `json:"outputs"`
+	// ChargedUSD is what the job charged, in US dollars (four decimals).
+	ChargedUSD float64 `json:"charged_usd"`
+	// RefundedUSD is what came back to the balance, in US dollars (four decimals).
+	RefundedUSD float64 `json:"refunded_usd"`
+	// CreditsCharged is what the job charged, in API credits.
+	//
+	// Deprecated: read ChargedUSD. The same amount in API credits ($0.0099 each); a later release removes it.
+	CreditsCharged int64 `json:"credits_charged"`
+	// CreditsRefunded is what came back to the balance, in API credits.
+	//
+	// Deprecated: read RefundedUSD. The same amount in API credits ($0.0099 each); a later release removes it.
+	CreditsRefunded int64      `json:"credits_refunded"`
+	Error           *JobError  `json:"error"`
+	CreatedAt       time.Time  `json:"created_at"`
+	CompletedAt     *time.Time `json:"completed_at"`
 }
 
 // Settled reports whether the job is done: succeeded, failed or canceled.
@@ -243,8 +263,13 @@ type JobError struct {
 type JobCanceled struct {
 	ID string `json:"id"`
 	// Outcome is "refunded", "requested", "too-late" or "already-settled".
-	Outcome         string `json:"outcome"`
-	CreditsRefunded int64  `json:"credits_refunded"`
+	Outcome string `json:"outcome"`
+	// RefundedUSD is what came back to the balance, in US dollars (four decimals).
+	RefundedUSD float64 `json:"refunded_usd"`
+	// CreditsRefunded is what came back to the balance, in API credits.
+	//
+	// Deprecated: read RefundedUSD. The same amount in API credits ($0.0099 each); a later release removes it.
+	CreditsRefunded int64 `json:"credits_refunded"`
 }
 
 // Account is the key's account: balance, tier and limits.
@@ -253,15 +278,24 @@ type Account struct {
 	Email string  `json:"email"`
 	Name  *string `json:"name"`
 	// Tier is "paid" once the account has topped up its API wallet; it sets the limits.
-	Tier    string         `json:"tier"`
+	Tier string `json:"tier"`
+	// BalanceUSD is what the next call can spend, in US dollars (four decimals).
+	BalanceUSD float64 `json:"balance_usd"`
+	// Credits is the balance in API credits.
+	//
+	// Deprecated: read BalanceUSD. The same amount in API credits ($0.0099 each); a later release removes it.
 	Credits AccountCredits `json:"credits"`
 	Key     AccountKey     `json:"key"`
 	Limits  AccountLimits  `json:"limits"`
 }
 
-// AccountCredits is the balance.
+// AccountCredits is the balance, in API credits.
+//
+// Deprecated: read Account.BalanceUSD. A later release removes it.
 type AccountCredits struct {
-	// Spendable is what the next call can spend.
+	// Spendable is what the next call can spend, in API credits.
+	//
+	// Deprecated: read Account.BalanceUSD. The same amount in API credits ($0.0099 each); a later release removes it.
 	Spendable int64 `json:"spendable"`
 }
 
@@ -269,7 +303,11 @@ type AccountCredits struct {
 type AccountKey struct {
 	ID             string   `json:"id"`
 	AllowedOrigins []string `json:"allowed_origins"`
-	// DailyCreditLimit is your own daily limit for this key, or nil for none.
+	// DailyLimitUSD is your own daily limit for this key in US dollars, or nil for none.
+	DailyLimitUSD *float64 `json:"daily_limit_usd"`
+	// DailyCreditLimit is your own daily limit for this key in API credits, or nil for none.
+	//
+	// Deprecated: read DailyLimitUSD. The same amount in API credits ($0.0099 each); a later release removes it.
 	DailyCreditLimit *int64 `json:"daily_credit_limit"`
 }
 
@@ -280,7 +318,11 @@ type AccountLimits struct {
 	RequestsPerMinute int    `json:"requests_per_minute"`
 	ReadsPerMinute    int    `json:"reads_per_minute"`
 	ConcurrentJobs    int    `json:"concurrent_jobs"`
-	// DailyCredits is what this key may still spend per UTC day; nil is no limit.
+	// DailyUSD is what this key may still spend per UTC day, in US dollars; nil is no limit.
+	DailyUSD *float64 `json:"daily_usd"`
+	// DailyCredits is what this key may still spend per UTC day, in API credits; nil is no limit.
+	//
+	// Deprecated: read DailyUSD. The same amount in API credits ($0.0099 each); a later release removes it.
 	DailyCredits *int64 `json:"daily_credits"`
 }
 
@@ -303,10 +345,20 @@ type Engine struct {
 	Capabilities EngineCapabilities `json:"capabilities"`
 }
 
-// EnginePrices are an engine's prices, in credits.
+// EnginePrices are an engine's prices.
 type EnginePrices struct {
+	// RenderUSD is one render, in US dollars (four decimals).
+	RenderUSD float64 `json:"render_usd"`
+	// EditUSD is one edit, in US dollars (four decimals).
+	EditUSD float64 `json:"edit_usd"`
+	// Render is one render, in API credits.
+	//
+	// Deprecated: read RenderUSD. The same amount in API credits ($0.0099 each); a later release removes it.
 	Render int64 `json:"render"`
-	Edit   int64 `json:"edit"`
+	// Edit is one edit, in API credits.
+	//
+	// Deprecated: read EditUSD. The same amount in API credits ($0.0099 each); a later release removes it.
+	Edit int64 `json:"edit"`
 }
 
 // EngineCapabilities say what an engine can do.
@@ -329,8 +381,13 @@ type VideoModel struct {
 // VideoPrice is a video price, per length.
 type VideoPrice struct {
 	// DurationSeconds is the clip length, or nil for the model's one fixed length.
-	DurationSeconds *int  `json:"duration_seconds"`
-	Credits         int64 `json:"credits"`
+	DurationSeconds *int `json:"duration_seconds"`
+	// USD is one clip of this length, in US dollars (four decimals).
+	USD float64 `json:"usd"`
+	// Credits is one clip of this length, in API credits.
+	//
+	// Deprecated: read USD. The same amount in API credits ($0.0099 each); a later release removes it.
+	Credits int64 `json:"credits"`
 }
 
 // JobStreamEvent is one event of Jobs.Stream: the job as it stands ("job"), then exactly one last

@@ -2,6 +2,9 @@ package mnml
 
 import (
 	"encoding/json"
+	"go/ast"
+	"go/parser"
+	"go/token"
 	"os"
 	"reflect"
 	"slices"
@@ -18,6 +21,7 @@ type schema struct {
 	Items      *schema           `json:"items"`
 	AnyOf      []schema          `json:"anyOf"`
 	Enum       []string          `json:"enum"`
+	Deprecated bool              `json:"deprecated"`
 }
 
 type operation struct {
@@ -140,4 +144,112 @@ func TestEveryRequestAndAnswerFieldIsAStructField(t *testing.T) {
 		sorted(EnhanceUpscale, EnhanceEnhance, EnhanceBGRemove, EnhanceOutpaint))
 	same(t, "job statuses", enum(job.Properties["status"]),
 		sorted(StatusQueued, StatusProcessing, StatusSucceeded, StatusFailed, StatusCanceled))
+}
+
+// Every answer field the spec deprecates, as "operation path: field path", and the struct field
+// that carries it here. Each one's doc has a "Deprecated:" paragraph naming its dollar field.
+var deprecatedFields = map[string]string{
+	"POST /v2/jobs/{id}/cancel: credits_refunded":      "JobCanceled.credits_refunded",
+	"POST /v2/edits: credits_charged":                  "JobStarted.credits_charged",
+	"POST /v2/enhancements: credits_charged":           "JobStarted.credits_charged",
+	"POST /v2/videos: credits_charged":                 "JobStarted.credits_charged",
+	"POST /v2/renders: credits_charged":                "RenderStarted.credits_charged",
+	"POST /v2/renders: jobs[].credits_charged":         "Job.credits_charged",
+	"POST /v2/renders: jobs[].credits_refunded":        "Job.credits_refunded",
+	"GET /v2/jobs/{id}: credits_charged":               "Job.credits_charged",
+	"GET /v2/jobs/{id}: credits_refunded":              "Job.credits_refunded",
+	"GET /v2/account: credits":                         "Account.credits",
+	"GET /v2/account: credits.spendable":               "AccountCredits.spendable",
+	"GET /v2/account: key.daily_credit_limit":          "AccountKey.daily_credit_limit",
+	"GET /v2/account: limits.daily_credits":            "AccountLimits.daily_credits",
+	"GET /v2/engines: engines[].prices.render":         "EnginePrices.render",
+	"GET /v2/engines: engines[].prices.edit":           "EnginePrices.edit",
+	"GET /v2/engines: video_models[].prices[].credits": "VideoPrice.credits",
+}
+
+// The credits.low webhook is not in the spec; its credit fields are deprecated all the same.
+var deprecatedWebhookFields = []string{"CreditsLow.balance", "CreditsLow.threshold"}
+
+func TestTheSDKDeprecatesWhatTheSpecDeprecates(t *testing.T) {
+	paths := loadSpec(t)
+	var found []string
+	var walk func(op string, s schema, path string)
+	walk = func(op string, s schema, path string) {
+		at := path
+		if s.Items != nil {
+			s, at = *s.Items, path+"[]"
+		}
+		for _, a := range s.AnyOf {
+			if a.Properties != nil {
+				s = a
+			}
+		}
+		for k, v := range s.Properties {
+			p := k
+			if at != "" {
+				p = at + "." + k
+			}
+			if v.Deprecated {
+				found = append(found, op+": "+p)
+			}
+			walk(op, v, p)
+		}
+	}
+	for p, methods := range paths {
+		for m, o := range methods {
+			for code, r := range o.Responses {
+				if strings.HasPrefix(code, "2") {
+					if c, ok := r.Content["application/json"]; ok {
+						walk(strings.ToUpper(m)+" "+p, c.Schema.Properties["data"], "")
+					}
+				}
+			}
+		}
+	}
+	var want []string
+	for k := range deprecatedFields {
+		want = append(want, k)
+	}
+	slices.Sort(found)
+	found = slices.Compact(found) // a render answers 200 (with a wait) or 202, the same fields
+	slices.Sort(want)
+	same(t, "deprecated in the spec", found, want)
+
+	// The struct fields whose doc carries a "Deprecated:" paragraph, as "Type.json_name".
+	var marked []string
+	fset := token.NewFileSet()
+	for _, file := range []string{"types.go", "webhooks.go"} {
+		f, err := parser.ParseFile(fset, file, nil, parser.ParseComments)
+		if err != nil {
+			t.Fatal(err)
+		}
+		ast.Inspect(f, func(n ast.Node) bool {
+			ts, ok := n.(*ast.TypeSpec)
+			if !ok {
+				return true
+			}
+			st, ok := ts.Type.(*ast.StructType)
+			if !ok || strings.HasSuffix(ts.Name.Name, "Request") {
+				return false // request fields (ImageURL) are not answers
+			}
+			for _, fd := range st.Fields.List {
+				if fd.Doc == nil || fd.Tag == nil || !strings.Contains(fd.Doc.Text(), "\nDeprecated: ") {
+					continue
+				}
+				tag := reflect.StructTag(strings.Trim(fd.Tag.Value, "`")).Get("json")
+				name, _, _ := strings.Cut(tag, ",")
+				marked = append(marked, ts.Name.Name+"."+name)
+			}
+			return false
+		})
+	}
+	wantMarked := slices.Clone(deprecatedWebhookFields)
+	for _, v := range deprecatedFields {
+		if !slices.Contains(wantMarked, v) {
+			wantMarked = append(wantMarked, v)
+		}
+	}
+	slices.Sort(marked)
+	slices.Sort(wantMarked)
+	same(t, "deprecated in the SDK", wantMarked, marked)
 }

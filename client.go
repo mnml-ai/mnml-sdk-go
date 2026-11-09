@@ -31,7 +31,7 @@ import (
 )
 
 // Version is this SDK's version, sent in the User-Agent.
-const Version = "0.1.0"
+const Version = "0.2.0"
 
 // MaxWaitSeconds is the longest the API holds an answer (wait), under Cloudflare's 100-second limit.
 const MaxWaitSeconds = 90
