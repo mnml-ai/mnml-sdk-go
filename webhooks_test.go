@@ -51,6 +51,20 @@ func TestASignedDeliveryVerifiesAndReadsAsAJob(t *testing.T) {
 	}
 }
 
+func TestCreditsLowReadsInDollars(t *testing.T) {
+	body := []byte(`{"type":"credits.low","timestamp":"2026-10-18T09:00:40Z",` +
+		`"data":{"balance_usd":0.396,"threshold_usd":0.99,"balance":40,"threshold":100}}`)
+	sig, _ := SignWebhook(secret, "msg_1", now.Unix(), body)
+	ev, err := VerifyWebhook(body, webhookHeaders(sig, now.Unix()), secret, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	low, err := ev.CreditsLow()
+	if err != nil || low.BalanceUSD != 0.396 || low.ThresholdUSD != 0.99 {
+		t.Fatalf("low %+v err %v", low, err)
+	}
+}
+
 func TestAnyOfSeveralSignaturesMayMatch(t *testing.T) {
 	sig, _ := SignWebhook(secret, "msg_1", now.Unix(), eventBody)
 	if _, err := VerifyWebhook(eventBody, webhookHeaders("v1,c29tZXRoaW5n "+sig, now.Unix()), secret, now); err != nil {
