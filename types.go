@@ -170,6 +170,9 @@ type VideoRequest struct {
 	// Motion is "subtle" (the default), "balanced", "dynamic" or "auto".
 	Motion string `json:"motion,omitempty"`
 	Prompt string `json:"prompt,omitempty"`
+	// RawPrompt is your own prompt, sent to the model exactly as written, in place of Prompt.
+	// Nothing is added, so CameraMovement and Motion are not applied.
+	RawPrompt string `json:"raw_prompt,omitempty"`
 	// EndFrame is a last frame to move towards.
 	EndFrame *Source `json:"end_frame,omitempty"`
 	// Cinematic is v1.1 only: the Cinematic variant, which needs EndFrame.
@@ -187,6 +190,10 @@ type JobStarted struct {
 	//
 	// Deprecated: read ChargedUSD. The same amount in API credits ($0.0099 each); a later release removes it.
 	CreditsCharged int64 `json:"credits_charged"`
+	// ListUSD is the price at list, before your account's API discount, in US dollars.
+	ListUSD float64 `json:"list_usd"`
+	// DiscountPercent is your account's API discount on this call, in percent (35.39 means 35.39 % off); 0 when none.
+	DiscountPercent float64 `json:"discount_percent"`
 	// Replayed is true when this answers an earlier identical request: nothing new was charged.
 	Replayed bool `json:"replayed"`
 	// Notes say what the API changed or dropped from the request.
@@ -203,9 +210,13 @@ type RenderStarted struct {
 	// CreditsCharged is what the call charged, in API credits.
 	//
 	// Deprecated: read ChargedUSD. The same amount in API credits ($0.0099 each); a later release removes it.
-	CreditsCharged int64    `json:"credits_charged"`
-	Replayed       bool     `json:"replayed"`
-	Notes          []string `json:"notes"`
+	CreditsCharged int64 `json:"credits_charged"`
+	// ListUSD is the price at list, before your account's API discount, in US dollars.
+	ListUSD float64 `json:"list_usd"`
+	// DiscountPercent is your account's API discount on this call, in percent (35.39 means 35.39 % off); 0 when none.
+	DiscountPercent float64  `json:"discount_percent"`
+	Replayed        bool     `json:"replayed"`
+	Notes           []string `json:"notes"`
 	// Jobs is set only with a wait: every job as it stood when the wait ended, outputs included.
 	Jobs []Job `json:"jobs,omitempty"`
 }
@@ -230,7 +241,11 @@ type Job struct {
 	// CreditsRefunded is what came back to the balance, in API credits.
 	//
 	// Deprecated: read RefundedUSD. The same amount in API credits ($0.0099 each); a later release removes it.
-	CreditsRefunded int64      `json:"credits_refunded"`
+	CreditsRefunded int64 `json:"credits_refunded"`
+	// ListUSD is the price at list, before your account's API discount, in US dollars.
+	ListUSD float64 `json:"list_usd"`
+	// DiscountPercent is your account's API discount on this call, in percent (35.39 means 35.39 % off); 0 when none.
+	DiscountPercent float64    `json:"discount_percent"`
 	Error           *JobError  `json:"error"`
 	CreatedAt       time.Time  `json:"created_at"`
 	CompletedAt     *time.Time `json:"completed_at"`

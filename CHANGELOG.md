@@ -22,6 +22,11 @@ has the dollar fields and steers you to them. Nothing is removed, so 0.1.0 code 
   the answer fields the spec does.
 - `Version` is `0.2.0`; README reads the dollar fields.
 
+- `RawPrompt` on `VideoRequest`: your own prompt, sent to the video model exactly as written in
+  place of `Prompt`. Nothing is added, so `CameraMovement` and `Motion` are not applied.
+- `ListUSD` and `DiscountPercent` on `JobStarted`, `RenderStarted` and `Job`: the price before
+  your account's API discount, and the discount in percent (0 when none).
+
 ## 0.1.0
 
 First release.
